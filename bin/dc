@@ -1,0 +1,129 @@
+#!/usr/bin/env ruby
+require "dotenv"
+require "etc"
+
+
+curr_dir = Dir.pwd
+Dotenv.load
+
+user = Etc.getlogin
+HOME = Dir.home(user)
+
+def keys
+  urls = ENV.keys.select { |key|
+    key.start_with?("DC_") && key.end_with?("_URL")
+  }
+  urls.map! { |key|
+    key[/DC_(.+)_URL/, 1].downcase
+  }
+
+  paths = ENV.keys.select { |key|
+    key.start_with?("DC_") && key.end_with?("_PATH")
+  }
+  paths.map! { |key|
+    key[/DC_(.+)_PATH/, 1].downcase
+  }
+
+  a, b = urls, paths
+  (a+b).uniq - ((a-b) + (b-a))
+end
+
+App = Struct.new(:name) do
+  def initialize(name: , env: ENV)
+    self.name = name.to_s.downcase
+  end
+
+  def to_s
+    name
+  end
+
+  def path
+    path = "DC_#{name.upcase}_PATH"
+    ENV[path].gsub(/\A~/, HOME)
+  end
+
+  def url
+    url = "DC_#{name.upcase}_URL"
+    ENV[url].gsub(/\A~/, HOME)
+  end
+
+  def port
+    url[/:(\d+)/, 1]
+  end
+
+  def start
+    Dir.chdir(path) do
+      `#{start_command}`
+    end
+  end
+
+  def kill
+    Dir.chdir(path) do
+      `#{kill_command}`
+    end
+  end
+
+  def pid_file
+    "#{path}/tmp/pids/server.pid"
+  end
+
+  def pid
+    if File.exist?(pid_file)
+      File.new(pid_file).read
+    end
+  end
+
+  def start_command
+    [
+      "rails server",
+      "--port=#{port}",
+      "-d",
+    ].join(" ")
+  end
+
+  def kill_command
+    [
+      "kill -9",
+      pid,
+    ].join(" ")
+  end
+end
+
+apps = keys.map do |app|
+  App.new(name: app)
+end
+
+option = ARGV[0]
+apps.each do |app|
+  case option.to_s
+
+  when ""
+    app.start
+    puts "#{app}: #{app.url}"
+  when "start"
+    app.start
+    puts "#{app}: #{app.url}"
+
+  when "kill"
+    app.kill
+
+  when "restart"
+    app.kill
+    app.start
+    puts "#{app}: #{app.url}"
+
+  when "dry-start"
+    puts app.start_command
+  when "dry-kill"
+    puts app.kill_command
+
+  when "urls"
+    puts "#{app}: #{app.url}"
+
+  when "paths"
+    puts "#{app}: #{app.path}"
+
+  else
+    puts "OPTION: #{option.inspect}"
+  end
+end
