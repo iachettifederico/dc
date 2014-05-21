@@ -1,0 +1,5 @@
+* Dc
+
+Managing DevChat.tv applications.
+
+Maybe it will turn into something else
