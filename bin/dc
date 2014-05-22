@@ -114,11 +114,13 @@ def apps
   @app_names.map!(&:downcase)
 
   if OPTIONS[:dbrecreate] || OPTIONS[:dbmigrate] || OPTIONS[:dbseed]
-    @app_names.map { |name| App.new(name: name) }
-  elsif @app_names.all? { |name| keys.include?(name) }
     @app_names = [ENV["DC_DB_APP"]]
+  end
+
+  if @app_names.all? { |name| keys.include?(name) }
+    @app_names.map { |name| App.new(name: name) }
   else
-    app_names.each do |name|
+    @app_names.each do |name|
       unless keys.include?(name)
         puts "Invalid App name: #{name}"
       end
