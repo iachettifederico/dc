@@ -3,3 +3,36 @@
 Managing DevChat.tv applications.
 
 Maybe it will turn into something else
+
+* Usage
+dc --help
+
+** You can run dc using the following syntax
+#+BEGIN_SRC bash
+dc [app names][options]
+#+END_SRC
+
+*** App names
+If you want to specify on which specific apps to run the desired command, list the app names
+
+For sxample, to restart the api and admin apps:
+#+BEGIN_SRC bash
+dc api admin --restart
+#+END_SRC
+
+or
+
+#+BEGIN_SRC bash
+dc api admin -r
+#+END_SRC
+
+*** Options
+You can specify the following options:
+
+    --start, -s:   Start apps
+     --kill, -k:   Kill apps
+  --restart, -r:   Kill and Restart apps
+    --paths, -p:   Print paths
+     --urls, -u:   Print urls
+      --dry, -d:   Dry Run
+     --help, -h:   Show this message
