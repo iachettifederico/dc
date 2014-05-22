@@ -1,32 +1,7 @@
 #!/usr/bin/env ruby
 require "dotenv"
 require "etc"
-
-
-curr_dir = Dir.pwd
-Dotenv.load
-
-user = Etc.getlogin
-HOME = Dir.home(user)
-
-def keys
-  urls = ENV.keys.select { |key|
-    key.start_with?("DC_") && key.end_with?("_URL")
-  }
-  urls.map! { |key|
-    key[/DC_(.+)_URL/, 1].downcase
-  }
-
-  paths = ENV.keys.select { |key|
-    key.start_with?("DC_") && key.end_with?("_PATH")
-  }
-  paths.map! { |key|
-    key[/DC_(.+)_PATH/, 1].downcase
-  }
-
-  a, b = urls, paths
-  (a+b).uniq - ((a-b) + (b-a))
-end
+require "trollop"
 
 App = Struct.new(:name) do
   def initialize(name: , env: ENV)
@@ -89,41 +64,86 @@ App = Struct.new(:name) do
   end
 end
 
-apps = keys.map do |app|
-  App.new(name: app)
+curr_dir = Dir.pwd
+Dotenv.load
+
+user = Etc.getlogin
+HOME = Dir.home(user)
+
+def keys
+  urls = ENV.keys.select { |key|
+    key.start_with?("DC_") && key.end_with?("_URL")
+  }
+  urls.map! { |key|
+    key[/DC_(.+)_URL/, 1].downcase
+  }
+
+  paths = ENV.keys.select { |key|
+    key.start_with?("DC_") && key.end_with?("_PATH")
+  }
+  paths.map! { |key|
+    key[/DC_(.+)_PATH/, 1].downcase
+  }
+
+  a, b = urls, paths
+  (a+b).uniq - ((a-b) + (b-a))
 end
 
-option = ARGV[0]
-apps.each do |app|
-  case option.to_s
 
-  when ""
-    app.start
-    puts "#{app}: #{app.url}"
-  when "start"
-    app.start
-    puts "#{app}: #{app.url}"
+require 'trollop'
+OPTIONS = Trollop::options do
+  # General actions
+  opt :start,   "Start apps", short: :s
+  opt :kill,    "Kill apps", short: :k
+  opt :restart, "Kill and Restart apps", short: :r
 
-  when "kill"
-    app.kill
+  # Information
+  opt :paths, "Print paths", short: :p
+  opt :urls,  "Print urls", short: :u
+  opt :dry,   "Dry Run"
 
-  when "restart"
-    app.kill
-    app.start
-    puts "#{app}: #{app.url}"
+  # # Database
+  # opt :dbrecreate, "Recreate Database", short: :m
+  # opt :dbmigrate,  "Migrate Database"
+  # opt :dbseed,     "Seed Database"
+  # opt :dbdrop,     "Drop Database"
+end
 
-  when "dry-start"
-    puts app.start_command
-  when "dry-kill"
-    puts app.kill_command
+def apps
+  @app_names = ARGV.any? ? ARGV : keys
+  @app_names.map!(&:downcase)
 
-  when "urls"
-    puts "#{app}: #{app.url}"
-
-  when "paths"
-    puts "#{app}: #{app.path}"
-
+  if OPTIONS[:dbrecreate] || OPTIONS[:dbmigrate] || OPTIONS[:dbseed]
+    @app_names.map { |name| App.new(name: name) }
+  elsif @app_names.all? { |name| keys.include?(name) }
+    @app_names = [ENV["DC_DB_APP"]]
   else
-    puts "OPTION: #{option.inspect}"
+    app_names.each do |name|
+      unless keys.include?(name)
+        puts "Invalid App name: #{name}"
+      end
+    end
+    exit(1)
+  end
+end
+
+max_name_length = apps.max { |a, b| a.name.size <=> b.name.size }.name.size
+
+apps.each do |app|
+  if OPTIONS[:kill] || OPTIONS[:restart] || OPTIONS[:dbrecreate] || OPTIONS[:dbmigrate]
+    app.kill
+    puts "Stopping #{app}"
+  end
+
+  if OPTIONS[:start] || OPTIONS[:restart] || OPTIONS[:dbrecreate] || OPTIONS[:dbmigrate]
+    app.start
+  end
+
+  if OPTIONS[:urls] || OPTIONS[:start] || OPTIONS[:restart]
+    puts "%#{max_name_length}s: %s" % [app, app.url]
+  end
+
+  if OPTIONS[:paths]
+    puts "%#{max_name_length}s: %s" % [app, app.path]
   end
 end

@@ -23,4 +23,5 @@ Gem::Specification.new do |spec|
 
   spec.add_dependency "dotenv"
   spec.add_dependency "etc"
+  spec.add_dependency "trollop"
 end
