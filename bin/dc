@@ -12,6 +12,10 @@ App = Struct.new(:name) do
     name
   end
 
+  def ==(other)
+    name == other.name
+  end
+
   def path
     path = "DC_#{name.upcase}_PATH"
     ENV[path].gsub(/\A~/, HOME)
@@ -62,6 +66,63 @@ App = Struct.new(:name) do
       pid,
     ].join(" ")
   end
+
+  # DB
+  def db_drop_command
+    [
+      "rake db:drop",
+      "&&",
+      "rake db:drop RAILS_ENV=test",
+    ].join(" ")
+  end
+
+  def db_drop
+    Dir.chdir(path) do
+      `#{db_drop_command}`
+    end
+  end
+
+  def db_create_command
+    [
+      "rake db:create",
+      "&&",
+      "rake db:create RAILS_ENV=test",
+    ].join(" ")
+  end
+
+  def db_create
+    Dir.chdir(path) do
+      `#{db_create_command}`
+    end
+  end
+
+  def db_migrate_command
+    [
+      "rake db:migrate",
+      "&&",
+      "rake db:migrate RAILS_ENV=test",
+    ].join(" ")
+  end
+
+  def db_migrate
+    Dir.chdir(path) do
+      `#{db_migrate_command}`
+    end
+  end
+
+  def db_seed_command
+    [
+      "rake db:seed",
+      "&&",
+      "rake db:seed RAILS_ENV=test",
+    ].join(" ")
+  end
+
+  def db_seed
+    Dir.chdir(path) do
+      `#{db_seed_command}`
+    end
+  end
 end
 
 curr_dir = Dir.pwd
@@ -103,19 +164,21 @@ OPTIONS = Trollop::options do
   opt :dry,   "Dry Run"
 
   # # Database
-  # opt :dbrecreate, "Recreate Database", short: :m
+  opt :dbrecreate, "Recreate Database", short: :m
+
+  opt :dbdrop,     "Drop Database"
+  opt :dbcreate,   "Recreate Database"
   # opt :dbmigrate,  "Migrate Database"
   # opt :dbseed,     "Seed Database"
-  # opt :dbdrop,     "Drop Database"
+end
+
+def db_app
+  @db_app ||= App.new(name: ENV["DC_DB_APP"])
 end
 
 def apps
   @app_names = ARGV.any? ? ARGV : keys
   @app_names.map!(&:downcase)
-
-  if OPTIONS[:dbrecreate] || OPTIONS[:dbmigrate] || OPTIONS[:dbseed]
-    @app_names = [ENV["DC_DB_APP"]]
-  end
 
   if @app_names.all? { |name| keys.include?(name) }
     @app_names.map { |name| App.new(name: name) }
@@ -129,23 +192,46 @@ def apps
   end
 end
 
+
 max_name_length = apps.max { |a, b| a.name.size <=> b.name.size }.name.size
 
-apps.each do |app|
-  if OPTIONS[:kill] || OPTIONS[:restart] || OPTIONS[:dbrecreate] || OPTIONS[:dbmigrate]
-    app.kill
+if OPTIONS[:kill] || OPTIONS[:restart] || OPTIONS[:start] || OPTIONS[:urls] || OPTIONS[:paths]
+  apps.each do |app|
+    if OPTIONS[:kill]
+      puts "Stopping #{app}"
+    end
+
+    if OPTIONS[:kill] || OPTIONS[:restart]
+      app.kill
+    end
+
+    if OPTIONS[:start] || OPTIONS[:restart]
+      app.start
+    end
+
+    if OPTIONS[:urls] || OPTIONS[:start] || OPTIONS[:restart]
+      puts "%#{max_name_length}s: %s" % [app, app.url]
+    end
+
+    if OPTIONS[:paths]
+      puts "%#{max_name_length}s: %s" % [app, app.path]
+    end
+  end
+elsif OPTIONS[:dbrecreate]
+  apps.each do |app|
     puts "Stopping #{app}"
+    app.kill
   end
 
-  if OPTIONS[:start] || OPTIONS[:restart] || OPTIONS[:dbrecreate] || OPTIONS[:dbmigrate]
+  puts "Recreating database"
+  db_app.db_drop
+  db_app.db_create
+  db_app.db_migrate
+  db_app.db_seed
+  puts "Database recreated"
+
+  apps.each do |app|
+    puts "Starting #{app}"
     app.start
-  end
-
-  if OPTIONS[:urls] || OPTIONS[:start] || OPTIONS[:restart]
-    puts "%#{max_name_length}s: %s" % [app, app.url]
-  end
-
-  if OPTIONS[:paths]
-    puts "%#{max_name_length}s: %s" % [app, app.path]
   end
 end
