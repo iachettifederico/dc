@@ -27,6 +27,7 @@ dc api admin -r
 #+END_SRC
 
 *** Options
+#+BEGIN_EXAMPLE
 You can specify the following options:
 
     --start, -s:   Start apps
@@ -36,3 +37,4 @@ You can specify the following options:
      --urls, -u:   Print urls
       --dry, -d:   Dry Run
      --help, -h:   Show this message
+#+END_EXAMPLE
