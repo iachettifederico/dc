@@ -5,7 +5,9 @@ Managing DevChat.tv applications.
 Maybe it will turn into something else
 
 * Usage
+#+BEGIN_EXAMPLE
 dc --help
+#+END_EXAMPLE
 
 ** You can run dc using the following syntax
 #+BEGIN_SRC bash
