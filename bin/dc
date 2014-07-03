@@ -4,7 +4,7 @@ require "etc"
 require "trollop"
 
 App = Struct.new(:name) do
-  def initialize(name: , env: ENV)
+  def initialize(name: , env: ENV, dry: false)
     self.name = name.to_s.downcase
   end
 
@@ -123,6 +123,31 @@ App = Struct.new(:name) do
       `#{db_seed_command}`
     end
   end
+
+  def bundle_command
+    [
+      "bundle install",
+      "pessimize -c patch",
+      "rm Gemfile.backup",
+      "rm Gemfile.lock.backup"
+    ].join(" &&  ")
+  end
+
+  def bundle
+    Dir.chdir(path) do
+      `#{bundle_command}`
+    end
+  end
+
+  # RUN
+  def run(command)
+    Dir.chdir(path) do
+      puts "-" * 50
+      puts `#{command}`
+      puts "-" * 50
+    end
+  end
+
 end
 
 curr_dir = Dir.pwd
@@ -170,6 +195,10 @@ OPTIONS = Trollop::options do
   opt :dbcreate,   "Recreate Database"
   # opt :dbmigrate,  "Migrate Database"
   # opt :dbseed,     "Seed Database"
+
+  opt :bundle, "bundle install and pessimize", short: :b
+
+  opt :command, "Run a specific command in all apps", short: :c, type: String
 end
 
 def db_app
@@ -195,21 +224,32 @@ end
 
 max_name_length = apps.max { |a, b| a.name.size <=> b.name.size }.name.size
 
-if OPTIONS[:kill] || OPTIONS[:restart] || OPTIONS[:start] || OPTIONS[:urls] || OPTIONS[:paths]
+if OPTIONS[:kill] || OPTIONS[:restart] || OPTIONS[:start] || OPTIONS[:urls] || OPTIONS[:paths] || OPTIONS[:bundle] || OPTIONS[:command]
   apps.each do |app|
     if OPTIONS[:kill]
       puts "Stopping #{app}"
     end
 
-    if OPTIONS[:kill] || OPTIONS[:restart]
+    if OPTIONS[:kill] || OPTIONS[:restart] || OPTIONS[:bundle] || OPTIONS[:command]
       app.kill
     end
 
-    if OPTIONS[:start] || OPTIONS[:restart]
+    if OPTIONS[:bundle]
+      puts "Running bundle on %s" % [app, app.url]
+      app.bundle
+      puts "%s bundled" % [app, app.url]
+    end
+
+    if OPTIONS[:command]
+      puts "%s Running: %s" % [app, OPTIONS[:command]]
+      app.run(OPTIONS[:command])
+    end
+
+    if OPTIONS[:start] || OPTIONS[:restart] || OPTIONS[:command]
       app.start
     end
 
-    if OPTIONS[:urls] || OPTIONS[:start] || OPTIONS[:restart]
+    if OPTIONS[:urls] || OPTIONS[:start] || OPTIONS[:restart] || OPTIONS[:bundle]
       puts "%#{max_name_length}s: %s" % [app, app.url]
     end
 
