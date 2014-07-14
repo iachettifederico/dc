@@ -143,7 +143,11 @@ App = Struct.new(:name) do
   def run(command)
     Dir.chdir(path) do
       puts "-" * 50
-      puts `#{command}`
+      IO.popen(command) do |out|
+        out.each_line do |line|
+          puts line
+        end
+      end
       puts "-" * 50
     end
   end
